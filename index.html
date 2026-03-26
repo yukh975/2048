@@ -597,8 +597,10 @@ body {
     const setLine = (i, line) => {
       for (let j = 0; j < SIZE; j++) {
         const [r, c] = dir === 'up' ? [j, i] : dir === 'down' ? [SIZE - 1 - j, i] : dir === 'left' ? [i, j] : [i, SIZE - 1 - j];
-        if (grid[r][c] !== line[j]) moved = true;
-        grid[r][c] = line[j];
+        const old = grid[r][c];
+        const nw = line[j];
+        if ((old === null) !== (nw === null) || (old && nw && old.val !== nw.val)) moved = true;
+        grid[r][c] = nw;
       }
     };
 
