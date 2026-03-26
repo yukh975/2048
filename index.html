@@ -578,11 +578,11 @@ body {
 
   function move(dir) {
     if (over || paused) return;
+    const before = grid.map(row => row.map(t => t ? t.val : 0));
     prevGrid = snapshotGrid();
     prevScore = score;
     prevWon = won;
     clearFlags();
-    moved = false;
     let pts = 0;
 
     const getLine = (i) => {
@@ -597,10 +597,7 @@ body {
     const setLine = (i, line) => {
       for (let j = 0; j < SIZE; j++) {
         const [r, c] = dir === 'up' ? [j, i] : dir === 'down' ? [SIZE - 1 - j, i] : dir === 'left' ? [i, j] : [i, SIZE - 1 - j];
-        const old = grid[r][c];
-        const nw = line[j];
-        if ((old === null) !== (nw === null) || (old && nw && old.val !== nw.val)) moved = true;
-        grid[r][c] = nw;
+        grid[r][c] = line[j];
       }
     };
 
@@ -610,6 +607,13 @@ body {
       pts += p;
       setLine(i, result);
     }
+
+    let moved = false;
+    for (let r = 0; r < SIZE && !moved; r++)
+      for (let c = 0; c < SIZE && !moved; c++) {
+        const after = grid[r][c] ? grid[r][c].val : 0;
+        if (before[r][c] !== after) moved = true;
+      }
 
     if (!moved) { prevGrid = null; return; }
 
