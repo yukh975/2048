@@ -320,6 +320,7 @@ body {
   <div class="controls">
     <div class="subtitle">Соединяй числа, чтобы получить <b>2048</b>!</div>
     <div style="display:flex;gap:8px;">
+      <button class="btn" id="undo-btn" style="opacity:0.4;" disabled title="Отменить ход (Ctrl+Z)">&#8630;</button>
       <button class="btn" id="help-btn">?</button>
       <button class="btn" id="new-game">Новая игра</button>
     </div>
@@ -330,6 +331,7 @@ body {
     <div class="help-row"><span class="help-key">&larr; &uarr; &darr; &rarr;</span><span>Стрелки на клавиатуре</span></div>
     <div class="help-row"><span class="help-key">Свайп</span><span>Провести пальцем по полю (мобилка)</span></div>
     <div class="help-row"><span class="help-key">Мышь</span><span>Зажать и потянуть по полю</span></div>
+    <div class="help-row"><span class="help-key">Ctrl+Z</span><span>Отменить последний ход (один раз)</span></div>
     <div class="help-sep"></div>
     <div class="help-title" style="margin-top:4px;">Правила</div>
     <div class="help-text">Сдвигай плитки в любую сторону. Одинаковые числа при столкновении сливаются в одно. Собери <b>2048</b>, чтобы победить! Можно продолжить после победы.</div>
@@ -364,6 +366,7 @@ body {
 
   let SIZE = 3;
   let grid, score, best, won, over, moved;
+  let prevGrid = null, prevScore = null, prevWon = null, canUndo = false;
 
   const COLORS = {
     2:    { bg: '#eee4da', color: '#776e65' },
@@ -489,8 +492,35 @@ body {
     return { result, pts };
   }
 
+  function snapshotGrid() {
+    return grid.map(row => row.map(t => t ? { val: t.val, isNew: false, merged: false } : null));
+  }
+
+  function undo() {
+    if (!canUndo || !prevGrid) return;
+    grid = prevGrid;
+    score = prevScore;
+    won = prevWon;
+    over = false;
+    canUndo = false;
+    prevGrid = null;
+    overlayLose.classList.remove('active');
+    overlayWin.classList.remove('active');
+    updateUndoBtn();
+    render();
+    saveState();
+  }
+
+  function updateUndoBtn() {
+    document.getElementById('undo-btn').disabled = !canUndo;
+    document.getElementById('undo-btn').style.opacity = canUndo ? '1' : '0.4';
+  }
+
   function move(dir) {
     if (over) return;
+    prevGrid = snapshotGrid();
+    prevScore = score;
+    prevWon = won;
     clearFlags();
     moved = false;
     let pts = 0;
@@ -519,7 +549,10 @@ body {
       setLine(i, result);
     }
 
-    if (!moved) return;
+    if (!moved) { prevGrid = null; return; }
+
+    canUndo = true;
+    updateUndoBtn();
 
     score += pts;
     if (score > best) { best = score; saveBest(); }
@@ -616,7 +649,11 @@ body {
     best = loadBest();
     over = false;
 
+    canUndo = false;
+    prevGrid = null;
+
     buildGrid();
+    setTimeout(() => updateUndoBtn(), 0);
 
     const saved = !fresh && loadState();
     if (saved) {
@@ -655,6 +692,7 @@ body {
 
   // Keyboard
   document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); return; }
     const map = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
     if (map[e.key]) { e.preventDefault(); move(map[e.key]); afterMove(); }
   });
@@ -696,6 +734,9 @@ body {
   document.getElementById('retry-btn').addEventListener('click', () => { localStorage.removeItem(storageKey('state')); init(true); });
   document.getElementById('restart-btn').addEventListener('click', () => { localStorage.removeItem(storageKey('state')); init(true); });
   document.getElementById('continue-btn').addEventListener('click', () => { overlayWin.classList.remove('active'); });
+
+  // Undo button
+  document.getElementById('undo-btn').addEventListener('click', () => undo());
 
   // Help panel
   document.getElementById('help-btn').addEventListener('click', () => {
