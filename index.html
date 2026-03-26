@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>2048</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #faf8ef;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100dvh;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.container {
+  width: min(500px, 96vw);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title {
+  font-size: 64px;
+  font-weight: 700;
+  color: #776e65;
+}
+
+.scores {
+  display: flex;
+  gap: 8px;
+}
+
+.score-box {
+  background: #bbada0;
+  border-radius: 6px;
+  padding: 8px 20px;
+  text-align: center;
+  min-width: 80px;
+}
+
+.score-box .label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #eee4da;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.score-box .value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.difficulty {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.diff-btn {
+  flex: 1;
+  padding: 10px 8px;
+  border: 3px solid #bbada0;
+  border-radius: 8px;
+  background: #faf8ef;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.diff-btn:hover { background: #ede0c8; }
+
+.diff-btn.active {
+  border-color: #8f7a66;
+  background: #8f7a66;
+}
+
+.diff-btn.active .diff-name,
+.diff-btn.active .diff-desc {
+  color: #f9f6f2;
+}
+
+.diff-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #776e65;
+}
+
+.diff-desc {
+  font-size: 12px;
+  color: #a09488;
+  margin-top: 2px;
+}
+
+.controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.subtitle {
+  color: #776e65;
+  font-size: 15px;
+}
+
+.btn {
+  background: #8f7a66;
+  color: #f9f6f2;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn:hover { background: #9f8b76; }
+
+.board-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background: #bbada0;
+  border-radius: 8px;
+  padding: 2%;
+}
+
+.grid {
+  display: grid;
+  gap: 2%;
+  width: 100%;
+  height: 100%;
+}
+
+.cell {
+  background: rgba(238, 228, 218, 0.35);
+  border-radius: 6px;
+}
+
+.tiles {
+  position: absolute;
+  inset: 2%;
+}
+
+.tile {
+  position: absolute;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: 700;
+  border-radius: 6px;
+  transition: top 0.12s ease, left 0.12s ease;
+  z-index: 1;
+}
+
+.tile.new {
+  animation: pop 0.2s ease;
+}
+
+.tile.merged {
+  animation: merge-pop 0.2s ease;
+  z-index: 2;
+}
+
+@keyframes pop {
+  0% { transform: scale(0); opacity: 0; }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes merge-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  z-index: 10;
+  background: rgba(238, 228, 218, 0.75);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.overlay .msg {
+  font-size: 48px;
+  font-weight: 700;
+  color: #776e65;
+}
+
+.overlay.win .msg { color: #f9c52b; }
+
+.score-add {
+  position: absolute;
+  font-size: 20px;
+  font-weight: 700;
+  color: #776e65;
+  opacity: 0;
+  animation: score-fly 0.7s ease forwards;
+  pointer-events: none;
+  z-index: 20;
+}
+
+@keyframes score-fly {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-50px); }
+}
+
+.help-panel {
+  display: none;
+  background: #fff;
+  border: 2px solid #bbada0;
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+.help-panel.open { display: block; }
+
+.help-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #776e65;
+  margin-bottom: 8px;
+}
+
+.help-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 0;
+  font-size: 14px;
+  color: #776e65;
+}
+
+.help-key {
+  display: inline-block;
+  min-width: 70px;
+  text-align: center;
+  background: #eee4da;
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-weight: 700;
+  font-size: 13px;
+  color: #776e65;
+  white-space: nowrap;
+}
+
+.help-sep {
+  height: 1px;
+  background: #e0d6cc;
+  margin: 10px 0;
+}
+
+.help-text {
+  font-size: 14px;
+  color: #776e65;
+  line-height: 1.5;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="title">2048</div>
+    <div class="scores">
+      <div class="score-box">
+        <div class="label">Score</div>
+        <div class="value" id="score">0</div>
+      </div>
+      <div class="score-box">
+        <div class="label">Best</div>
+        <div class="value" id="best">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="difficulty" id="difficulty">
+    <div class="diff-btn active" data-size="3">
+      <div class="diff-name">Easy</div>
+      <div class="diff-desc">3 &times; 3</div>
+    </div>
+    <div class="diff-btn" data-size="4">
+      <div class="diff-name">Classic</div>
+      <div class="diff-desc">4 &times; 4</div>
+    </div>
+    <div class="diff-btn" data-size="5">
+      <div class="diff-name">Hard</div>
+      <div class="diff-desc">5 &times; 5</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="subtitle">Соединяй числа, чтобы получить <b>2048</b>!</div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn" id="help-btn">?</button>
+      <button class="btn" id="new-game">Новая игра</button>
+    </div>
+  </div>
+
+  <div class="help-panel" id="help-panel">
+    <div class="help-title">Управление</div>
+    <div class="help-row"><span class="help-key">&larr; &uarr; &darr; &rarr;</span><span>Стрелки на клавиатуре</span></div>
+    <div class="help-row"><span class="help-key">Свайп</span><span>Провести пальцем по полю (мобилка)</span></div>
+    <div class="help-row"><span class="help-key">Мышь</span><span>Зажать и потянуть по полю</span></div>
+    <div class="help-sep"></div>
+    <div class="help-title" style="margin-top:4px;">Правила</div>
+    <div class="help-text">Сдвигай плитки в любую сторону. Одинаковые числа при столкновении сливаются в одно. Собери <b>2048</b>, чтобы победить! Можно продолжить после победы.</div>
+    <button class="btn" id="help-close" style="margin-top:10px;width:100%;">Понятно!</button>
+  </div>
+
+  <div class="board-wrapper" id="board">
+    <div class="grid" id="grid"></div>
+    <div class="tiles" id="tiles"></div>
+    <div class="overlay" id="overlay-lose">
+      <div class="msg">Игра окончена!</div>
+      <button class="btn" id="retry-btn">Ещё раз</button>
+    </div>
+    <div class="overlay win" id="overlay-win">
+      <div class="msg">Победа!</div>
+      <button class="btn" id="continue-btn">Продолжить</button>
+      <button class="btn" id="restart-btn">Новая игра</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const gridEl = document.getElementById('grid');
+  const tilesEl = document.getElementById('tiles');
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const boardEl = document.getElementById('board');
+  const overlayLose = document.getElementById('overlay-lose');
+  const overlayWin = document.getElementById('overlay-win');
+  const difficultyEl = document.getElementById('difficulty');
+
+  let SIZE = 3;
+  let grid, score, best, won, over, moved;
+
+  const COLORS = {
+    2:    { bg: '#eee4da', color: '#776e65' },
+    4:    { bg: '#ede0c8', color: '#776e65' },
+    8:    { bg: '#f2b179', color: '#f9f6f2' },
+    16:   { bg: '#f59563', color: '#f9f6f2' },
+    32:   { bg: '#f67c5f', color: '#f9f6f2' },
+    64:   { bg: '#f65e3b', color: '#f9f6f2' },
+    128:  { bg: '#edcf72', color: '#f9f6f2' },
+    256:  { bg: '#edcc61', color: '#f9f6f2' },
+    512:  { bg: '#edc850', color: '#f9f6f2' },
+    1024: { bg: '#edc53f', color: '#f9f6f2' },
+    2048: { bg: '#edc22e', color: '#f9f6f2' },
+    4096: { bg: '#b784ab', color: '#f9f6f2' },
+    8192: { bg: '#7b68ae', color: '#f9f6f2' },
+  };
+
+  function getColor(val) {
+    return COLORS[val] || { bg: '#3c3a32', color: '#f9f6f2' };
+  }
+
+  function tileFont(val) {
+    const digits = String(val).length;
+    const base = SIZE === 3 ? 2.2 : SIZE === 4 ? 2 : 1.6;
+    if (digits <= 2) return base + 'em';
+    if (digits === 3) return (base * 0.78) + 'em';
+    if (digits === 4) return (base * 0.62) + 'em';
+    return (base * 0.5) + 'em';
+  }
+
+  function cellPercent() { return (100 - 2 * (SIZE - 1)) / SIZE; }
+
+  function tilePos(r, c) {
+    const gap = 2;
+    const cell = cellPercent();
+    return { left: (c * (cell + gap)) + '%', top: (r * (cell + gap)) + '%' };
+  }
+
+  function tileSize() {
+    const s = cellPercent();
+    return { width: s + '%', height: s + '%' };
+  }
+
+  function buildGrid() {
+    gridEl.innerHTML = '';
+    gridEl.style.gridTemplateColumns = `repeat(${SIZE}, 1fr)`;
+    gridEl.style.gridTemplateRows = `repeat(${SIZE}, 1fr)`;
+    for (let i = 0; i < SIZE * SIZE; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      gridEl.appendChild(cell);
+    }
+  }
+
+  function createTileEl(r, c, val, isNew) {
+    const el = document.createElement('div');
+    el.className = 'tile' + (isNew ? ' new' : '');
+    const pos = tilePos(r, c);
+    const sz = tileSize();
+    const col = getColor(val);
+    Object.assign(el.style, {
+      left: pos.left, top: pos.top,
+      width: sz.width, height: sz.height,
+      background: col.bg, color: col.color,
+      fontSize: tileFont(val),
+    });
+    el.textContent = val;
+    return el;
+  }
+
+  function render() {
+    tilesEl.innerHTML = '';
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        const t = grid[r][c];
+        if (t) {
+          const el = createTileEl(r, c, t.val, t.isNew);
+          if (t.merged) el.classList.add('merged');
+          tilesEl.appendChild(el);
+        }
+      }
+    }
+    scoreEl.textContent = score;
+    bestEl.textContent = best;
+  }
+
+  function emptyCells() {
+    const cells = [];
+    for (let r = 0; r < SIZE; r++)
+      for (let c = 0; c < SIZE; c++)
+        if (!grid[r][c]) cells.push({ r, c });
+    return cells;
+  }
+
+  function spawnTile() {
+    const empty = emptyCells();
+    if (!empty.length) return;
+    const { r, c } = empty[Math.floor(Math.random() * empty.length)];
+    grid[r][c] = { val: Math.random() < 0.9 ? 2 : 4, isNew: true, merged: false };
+  }
+
+  function clearFlags() {
+    for (let r = 0; r < SIZE; r++)
+      for (let c = 0; c < SIZE; c++)
+        if (grid[r][c]) { grid[r][c].isNew = false; grid[r][c].merged = false; }
+  }
+
+  function slideLine(line) {
+    let arr = line.filter(t => t !== null);
+    let pts = 0;
+    const result = [];
+    for (let i = 0; i < arr.length; i++) {
+      if (i + 1 < arr.length && arr[i].val === arr[i + 1].val) {
+        const nv = arr[i].val * 2;
+        result.push({ val: nv, isNew: false, merged: true });
+        pts += nv;
+        i++;
+      } else {
+        result.push({ val: arr[i].val, isNew: false, merged: false });
+      }
+    }
+    while (result.length < SIZE) result.push(null);
+    return { result, pts };
+  }
+
+  function move(dir) {
+    if (over) return;
+    clearFlags();
+    moved = false;
+    let pts = 0;
+
+    const getLine = (i) => {
+      const line = [];
+      for (let j = 0; j < SIZE; j++) {
+        const [r, c] = dir === 'up' ? [j, i] : dir === 'down' ? [SIZE - 1 - j, i] : dir === 'left' ? [i, j] : [i, SIZE - 1 - j];
+        line.push(grid[r][c]);
+      }
+      return line;
+    };
+
+    const setLine = (i, line) => {
+      for (let j = 0; j < SIZE; j++) {
+        const [r, c] = dir === 'up' ? [j, i] : dir === 'down' ? [SIZE - 1 - j, i] : dir === 'left' ? [i, j] : [i, SIZE - 1 - j];
+        if (grid[r][c] !== line[j]) moved = true;
+        grid[r][c] = line[j];
+      }
+    };
+
+    for (let i = 0; i < SIZE; i++) {
+      const line = getLine(i);
+      const { result, pts: p } = slideLine(line);
+      pts += p;
+      setLine(i, result);
+    }
+
+    if (!moved) return;
+
+    score += pts;
+    if (score > best) { best = score; saveBest(); }
+
+    spawnTile();
+    render();
+
+    if (pts > 0) showScoreAdd(pts);
+
+    if (!won && hasValue(2048)) {
+      won = true;
+      setTimeout(() => overlayWin.classList.add('active'), 300);
+      return;
+    }
+
+    if (!canMove()) {
+      over = true;
+      setTimeout(() => overlayLose.classList.add('active'), 400);
+    }
+  }
+
+  function hasValue(v) {
+    for (let r = 0; r < SIZE; r++)
+      for (let c = 0; c < SIZE; c++)
+        if (grid[r][c] && grid[r][c].val === v) return true;
+    return false;
+  }
+
+  function canMove() {
+    for (let r = 0; r < SIZE; r++)
+      for (let c = 0; c < SIZE; c++) {
+        if (!grid[r][c]) return true;
+        const v = grid[r][c].val;
+        if (c + 1 < SIZE && grid[r][c + 1] && grid[r][c + 1].val === v) return true;
+        if (r + 1 < SIZE && grid[r + 1][c] && grid[r + 1][c].val === v) return true;
+      }
+    return false;
+  }
+
+  function showScoreAdd(pts) {
+    const el = document.createElement('div');
+    el.className = 'score-add';
+    el.textContent = '+' + pts;
+    const rect = scoreEl.getBoundingClientRect();
+    const containerRect = document.querySelector('.container').getBoundingClientRect();
+    el.style.left = (rect.left - containerRect.left + rect.width / 2) + 'px';
+    el.style.top = (rect.top - containerRect.top) + 'px';
+    document.querySelector('.container').appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+
+  function storageKey(suffix) { return '2048-' + SIZE + '-' + suffix; }
+
+  function saveBest() {
+    try { localStorage.setItem(storageKey('best'), best); } catch(e) {}
+  }
+
+  function loadBest() {
+    try { return parseInt(localStorage.getItem(storageKey('best'))) || 0; } catch(e) { return 0; }
+  }
+
+  function saveState() {
+    try {
+      const state = { grid: grid.map(row => row.map(t => t ? t.val : 0)), score, won, size: SIZE };
+      localStorage.setItem(storageKey('state'), JSON.stringify(state));
+    } catch(e) {}
+  }
+
+  function loadState() {
+    try {
+      const s = JSON.parse(localStorage.getItem(storageKey('state')));
+      if (!s || !s.grid || s.size !== SIZE) return null;
+      return s;
+    } catch(e) { return null; }
+  }
+
+  function saveDifficulty() {
+    try { localStorage.setItem('2048-size', SIZE); } catch(e) {}
+  }
+
+  function loadDifficulty() {
+    try { return parseInt(localStorage.getItem('2048-size')) || 3; } catch(e) { return 3; }
+  }
+
+  function setActiveButton(size) {
+    difficultyEl.querySelectorAll('.diff-btn').forEach(b => {
+      b.classList.toggle('active', parseInt(b.dataset.size) === size);
+    });
+  }
+
+  function init(fresh) {
+    overlayLose.classList.remove('active');
+    overlayWin.classList.remove('active');
+    best = loadBest();
+    over = false;
+
+    buildGrid();
+
+    const saved = !fresh && loadState();
+    if (saved) {
+      score = saved.score;
+      won = saved.won;
+      grid = saved.grid.map(row => row.map(v => v ? { val: v, isNew: false, merged: false } : null));
+    } else {
+      score = 0;
+      won = false;
+      grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
+      spawnTile();
+      spawnTile();
+    }
+
+    render();
+  }
+
+  function switchDifficulty(newSize) {
+    if (newSize === SIZE) return;
+    SIZE = newSize;
+    saveDifficulty();
+    setActiveButton(SIZE);
+    init(true);
+  }
+
+  function afterMove() {
+    saveState();
+  }
+
+  // Difficulty buttons
+  difficultyEl.addEventListener('click', e => {
+    const btn = e.target.closest('.diff-btn');
+    if (!btn) return;
+    switchDifficulty(parseInt(btn.dataset.size));
+  });
+
+  // Keyboard
+  document.addEventListener('keydown', e => {
+    const map = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
+    if (map[e.key]) { e.preventDefault(); move(map[e.key]); afterMove(); }
+  });
+
+  // Touch / swipe
+  let tx, ty;
+  boardEl.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    tx = t.clientX; ty = t.clientY;
+  }, { passive: true });
+
+  boardEl.addEventListener('touchend', e => {
+    const t = e.changedTouches[0];
+    const dx = t.clientX - tx;
+    const dy = t.clientY - ty;
+    const abx = Math.abs(dx), aby = Math.abs(dy);
+    if (Math.max(abx, aby) < 20) return;
+    if (abx > aby) move(dx > 0 ? 'right' : 'left');
+    else move(dy > 0 ? 'down' : 'up');
+    afterMove();
+  }, { passive: true });
+
+  // Mouse drag
+  let mx, my, dragging = false;
+  boardEl.addEventListener('mousedown', e => { mx = e.clientX; my = e.clientY; dragging = true; });
+  document.addEventListener('mouseup', e => {
+    if (!dragging) return;
+    dragging = false;
+    const dx = e.clientX - mx, dy = e.clientY - my;
+    const abx = Math.abs(dx), aby = Math.abs(dy);
+    if (Math.max(abx, aby) < 20) return;
+    if (abx > aby) move(dx > 0 ? 'right' : 'left');
+    else move(dy > 0 ? 'down' : 'up');
+    afterMove();
+  });
+
+  // Buttons
+  document.getElementById('new-game').addEventListener('click', () => { localStorage.removeItem(storageKey('state')); init(true); });
+  document.getElementById('retry-btn').addEventListener('click', () => { localStorage.removeItem(storageKey('state')); init(true); });
+  document.getElementById('restart-btn').addEventListener('click', () => { localStorage.removeItem(storageKey('state')); init(true); });
+  document.getElementById('continue-btn').addEventListener('click', () => { overlayWin.classList.remove('active'); });
+
+  // Help panel
+  document.getElementById('help-btn').addEventListener('click', () => {
+    document.getElementById('help-panel').classList.toggle('open');
+  });
+  document.getElementById('help-close').addEventListener('click', () => {
+    document.getElementById('help-panel').classList.remove('open');
+  });
+
+  // Load saved difficulty
+  SIZE = loadDifficulty();
+  setActiveButton(SIZE);
+  init(false);
+})();
+</script>
+</body>
+</html>
