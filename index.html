@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>2048</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%23edc22e'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='Arial,sans-serif' font-weight='bold' font-size='22' fill='%23fff'%3E2048%3C/text%3E%3C/svg%3E">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -131,6 +132,37 @@ body {
 
 .btn:hover { background: #9f8b76; }
 
+.timer-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+}
+
+.timer-display {
+  font-size: 22px;
+  font-weight: 700;
+  color: #776e65;
+  font-variant-numeric: tabular-nums;
+  min-width: 70px;
+  text-align: center;
+}
+
+.pause-btn {
+  background: #8f7a66;
+  color: #f9f6f2;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+  line-height: 1;
+}
+
+.pause-btn:hover { background: #9f8b76; }
+
 .board-wrapper {
   position: relative;
   width: 100%;
@@ -218,6 +250,11 @@ body {
 
 .overlay.win .msg { color: #f9c52b; }
 
+.overlay.pause .msg {
+  font-size: 40px;
+  color: #8f7a66;
+}
+
 .score-add {
   position: absolute;
   font-size: 20px;
@@ -303,17 +340,21 @@ body {
   </div>
 
   <div class="difficulty" id="difficulty">
-    <div class="diff-btn active" data-size="3">
-      <div class="diff-name">Легко</div>
-      <div class="diff-desc">3 &times; 3</div>
-    </div>
-    <div class="diff-btn" data-size="4">
-      <div class="diff-name">Классика</div>
+    <div class="diff-btn active" data-size="4">
+      <div class="diff-name">Сложно</div>
       <div class="diff-desc">4 &times; 4</div>
     </div>
     <div class="diff-btn" data-size="5">
-      <div class="diff-name">Сложно</div>
+      <div class="diff-name">Средне</div>
       <div class="diff-desc">5 &times; 5</div>
+    </div>
+    <div class="diff-btn" data-size="6">
+      <div class="diff-name">Просто</div>
+      <div class="diff-desc">6 &times; 6</div>
+    </div>
+    <div class="diff-btn" data-size="8">
+      <div class="diff-name">Легко</div>
+      <div class="diff-desc">8 &times; 8</div>
     </div>
   </div>
 
@@ -326,12 +367,19 @@ body {
     </div>
   </div>
 
+  <div class="timer-row">
+    <div class="timer-display" id="timer">0:00</div>
+    <button class="pause-btn" id="pause-btn" title="Пауза (P)">&#9646;&#9646;</button>
+  </div>
+
   <div class="help-panel" id="help-panel">
     <div class="help-title">Управление</div>
     <div class="help-row"><span class="help-key">&larr; &uarr; &darr; &rarr;</span><span>Стрелки на клавиатуре</span></div>
     <div class="help-row"><span class="help-key">Свайп</span><span>Провести пальцем по полю (мобилка)</span></div>
     <div class="help-row"><span class="help-key">Мышь</span><span>Зажать и потянуть по полю</span></div>
     <div class="help-row"><span class="help-key">Ctrl+Z</span><span>Отменить последний ход (один раз)</span></div>
+    <div class="help-row"><span class="help-key">Enter</span><span>Новая игра</span></div>
+    <div class="help-row"><span class="help-key">P</span><span>Пауза</span></div>
     <div class="help-sep"></div>
     <div class="help-title" style="margin-top:4px;">Правила</div>
     <div class="help-text">Сдвигай плитки в любую сторону. Одинаковые числа при столкновении сливаются в одно. Собери <b>2048</b>, чтобы победить! Можно продолжить после победы.</div>
@@ -350,6 +398,10 @@ body {
       <button class="btn" id="continue-btn">Продолжить</button>
       <button class="btn" id="restart-btn">Новая игра</button>
     </div>
+    <div class="overlay pause" id="overlay-pause">
+      <div class="msg">Пауза</div>
+      <button class="btn" id="resume-btn">Продолжить</button>
+    </div>
   </div>
 </div>
 
@@ -362,11 +414,19 @@ body {
   const boardEl = document.getElementById('board');
   const overlayLose = document.getElementById('overlay-lose');
   const overlayWin = document.getElementById('overlay-win');
+  const overlayPause = document.getElementById('overlay-pause');
   const difficultyEl = document.getElementById('difficulty');
+  const timerEl = document.getElementById('timer');
+  const pauseBtn = document.getElementById('pause-btn');
 
-  let SIZE = 3;
+  let SIZE = 4;
   let grid, score, best, won, over, moved;
   let prevGrid = null, prevScore = null, prevWon = null, canUndo = false;
+
+  // Timer state
+  let timerSeconds = 0;
+  let timerInterval = null;
+  let paused = false;
 
   const COLORS = {
     2:    { bg: '#eee4da', color: '#776e65' },
@@ -390,7 +450,7 @@ body {
 
   function tileFont(val) {
     const digits = String(val).length;
-    const base = SIZE === 3 ? 2.2 : SIZE === 4 ? 2 : 1.6;
+    const base = SIZE <= 4 ? 2 : SIZE <= 5 ? 1.6 : SIZE <= 6 ? 1.3 : 0.95;
     if (digits <= 2) return base + 'em';
     if (digits === 3) return (base * 0.78) + 'em';
     if (digits === 4) return (base * 0.62) + 'em';
@@ -517,7 +577,7 @@ body {
   }
 
   function move(dir) {
-    if (over) return;
+    if (over || paused) return;
     prevGrid = snapshotGrid();
     prevScore = score;
     prevWon = won;
@@ -570,6 +630,7 @@ body {
 
     if (!canMove()) {
       over = true;
+      stopTimer();
       setTimeout(() => overlayLose.classList.add('active'), 400);
     }
   }
@@ -604,6 +665,48 @@ body {
     el.addEventListener('animationend', () => el.remove());
   }
 
+  // Timer functions
+  function formatTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function updateTimerDisplay() {
+    timerEl.textContent = formatTime(timerSeconds);
+  }
+
+  function startTimer() {
+    stopTimer();
+    timerInterval = setInterval(() => {
+      timerSeconds++;
+      updateTimerDisplay();
+      saveState();
+    }, 1000);
+  }
+
+  function stopTimer() {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+  }
+
+  function togglePause() {
+    if (over) return;
+    if (paused) {
+      paused = false;
+      overlayPause.classList.remove('active');
+      pauseBtn.innerHTML = '&#9646;&#9646;';
+      startTimer();
+    } else {
+      paused = true;
+      overlayPause.classList.add('active');
+      pauseBtn.innerHTML = '&#9654;';
+      stopTimer();
+    }
+  }
+
   function storageKey(suffix) { return '2048-' + SIZE + '-' + suffix; }
 
   function saveBest() {
@@ -616,7 +719,7 @@ body {
 
   function saveState() {
     try {
-      const state = { grid: grid.map(row => row.map(t => t ? t.val : 0)), score, won, size: SIZE };
+      const state = { grid: grid.map(row => row.map(t => t ? t.val : 0)), score, won, size: SIZE, timer: timerSeconds };
       localStorage.setItem(storageKey('state'), JSON.stringify(state));
     } catch(e) {}
   }
@@ -634,7 +737,7 @@ body {
   }
 
   function loadDifficulty() {
-    try { return parseInt(localStorage.getItem('2048-size')) || 3; } catch(e) { return 3; }
+    try { return parseInt(localStorage.getItem('2048-size')) || 4; } catch(e) { return 4; }
   }
 
   function setActiveButton(size) {
@@ -643,9 +746,17 @@ body {
     });
   }
 
+  function newGame() {
+    localStorage.removeItem(storageKey('state'));
+    init(true);
+  }
+
   function init(fresh) {
     overlayLose.classList.remove('active');
     overlayWin.classList.remove('active');
+    overlayPause.classList.remove('active');
+    paused = false;
+    pauseBtn.innerHTML = '&#9646;&#9646;';
     best = loadBest();
     over = false;
 
@@ -659,20 +770,25 @@ body {
     if (saved) {
       score = saved.score;
       won = saved.won;
+      timerSeconds = saved.timer || 0;
       grid = saved.grid.map(row => row.map(v => v ? { val: v, isNew: false, merged: false } : null));
     } else {
       score = 0;
       won = false;
+      timerSeconds = 0;
       grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
       spawnTile();
       spawnTile();
     }
 
+    updateTimerDisplay();
+    startTimer();
     render();
   }
 
   function switchDifficulty(newSize) {
     if (newSize === SIZE) return;
+    stopTimer();
     SIZE = newSize;
     saveDifficulty();
     setActiveButton(SIZE);
@@ -693,6 +809,9 @@ body {
   // Keyboard
   document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); return; }
+    if (e.key === 'Enter') { e.preventDefault(); newGame(); return; }
+    if (e.key === 'p' || e.key === 'P' || e.key === 'з' || e.key === 'З') { e.preventDefault(); togglePause(); return; }
+    if (paused) return;
     const map = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
     if (map[e.key]) { e.preventDefault(); move(map[e.key]); afterMove(); }
   });
@@ -705,6 +824,7 @@ body {
   }, { passive: true });
 
   boardEl.addEventListener('touchend', e => {
+    if (paused) return;
     const t = e.changedTouches[0];
     const dx = t.clientX - tx;
     const dy = t.clientY - ty;
@@ -721,6 +841,7 @@ body {
   document.addEventListener('mouseup', e => {
     if (!dragging) return;
     dragging = false;
+    if (paused) return;
     const dx = e.clientX - mx, dy = e.clientY - my;
     const abx = Math.abs(dx), aby = Math.abs(dy);
     if (Math.max(abx, aby) < 20) return;
@@ -730,13 +851,17 @@ body {
   });
 
   // Buttons
-  document.getElementById('new-game').addEventListener('click', () => { localStorage.removeItem(storageKey('state')); init(true); });
-  document.getElementById('retry-btn').addEventListener('click', () => { localStorage.removeItem(storageKey('state')); init(true); });
-  document.getElementById('restart-btn').addEventListener('click', () => { localStorage.removeItem(storageKey('state')); init(true); });
+  document.getElementById('new-game').addEventListener('click', () => newGame());
+  document.getElementById('retry-btn').addEventListener('click', () => newGame());
+  document.getElementById('restart-btn').addEventListener('click', () => newGame());
   document.getElementById('continue-btn').addEventListener('click', () => { overlayWin.classList.remove('active'); });
 
   // Undo button
   document.getElementById('undo-btn').addEventListener('click', () => undo());
+
+  // Pause button
+  pauseBtn.addEventListener('click', () => togglePause());
+  document.getElementById('resume-btn').addEventListener('click', () => togglePause());
 
   // Help panel
   document.getElementById('help-btn').addEventListener('click', () => {
